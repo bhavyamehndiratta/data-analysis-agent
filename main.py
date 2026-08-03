@@ -2,6 +2,9 @@ from fastapi import FastAPI
 from dotenv import load_dotenv
 from app.database import init_db
 from app.routes.upload import router as upload_router
+from app.routes.analyze import router as analyze_router
+from app.routes.stream import router as stream_router
+from app.routes.eval import router as eval_router
 
 load_dotenv()
 
@@ -12,6 +15,9 @@ async def startup():
     init_db()
 
 app.include_router(upload_router, prefix="/api")
+app.include_router(analyze_router, prefix="/api")
+app.include_router(stream_router, prefix="/api")
+app.include_router(eval_router, prefix="/api")
 
 @app.get("/")
 async def root():
