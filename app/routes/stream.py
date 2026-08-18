@@ -41,7 +41,7 @@ Question: {question}
     # Stream the response
     with client.messages.stream(
         model="claude-sonnet-4-6",
-        max_tokens=4096,
+        max_tokens=1024,
         system=system_prompt,
         tools=[{"type": "code_execution_20250522", "name": "code_execution"}],
         messages=[{"role": "user", "content": user_message}]

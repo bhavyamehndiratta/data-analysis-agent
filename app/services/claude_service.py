@@ -12,7 +12,7 @@ def build_dataset_context(filepath: str) -> str:
     else:
         df = pd.read_excel(filepath)
 
-    preview = df.head(5).to_string(index=False)
+    preview = df.head(3).to_string(index=False)
     dtypes = df.dtypes.to_string()
     shape = f"{len(df)} rows x {len(df.columns)} columns"
 
@@ -28,8 +28,8 @@ First 5 rows:
 def extract_follow_up_questions(answer: str) -> list[str]:
     """Ask Claude to identify follow-up questions worth investigating from an answer."""
     response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=512,
+        model="claude-haiku-4-5-20251001",
+        max_tokens=200,
         messages=[{
             "role": "user",
             "content": f"""Given this data analysis result:
@@ -49,15 +49,10 @@ Return ONLY the questions, one per line, no numbering, no explanation."""
 def run_analysis(filepath: str, question: str, depth: int = 0, max_depth: int = 2) -> dict:
     dataset_context = build_dataset_context(filepath)
 
-    system_prompt = """You are a data analysis agent. The user will ask a question about a dataset.
-
-You have access to a code execution tool. Use it to write and run Python code to answer the question accurately.
-
-Rules:
-- Always use code execution to compute answers. Never guess or estimate.
-- If your code errors, read the traceback carefully, fix the issue, and try again.
-- After getting a successful result, critique your own answer: is it statistically sound? Are there caveats?
-- Give your final answer in plain English with any important caveats noted.
+    system_prompt = """Data analysis agent. Use code execution to answer questions accurately. Be concise.
+- Never guess. Always run code.
+- Fix errors and retry.
+- Flag statistical caveats briefly.
 """
 
     user_message = f"""Here is the dataset:
@@ -89,7 +84,7 @@ Question: {question}
 
         response = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=4096,
+            max_tokens=1024,
             system=system_prompt,
             tools=[{"type": "code_execution_20250522", "name": "code_execution"}],
             messages=messages
