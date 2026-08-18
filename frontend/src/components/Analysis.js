@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
 import { Send, RotateCcw, ChevronDown, ChevronRight, FileText, Code } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 function DataQuality({ session }) {
   const issues = [];
@@ -61,6 +62,10 @@ function DrillDown({ items }) {
   );
 }
 
+const tableStyle = { borderCollapse: 'collapse', width: '100%', margin: '12px 0' };
+const thStyle = { border: '1px solid #374151', padding: '8px 12px', background: '#1f2937', color: '#f9fafb', fontSize: '13px', textAlign: 'left' };
+const tdStyle = { border: '1px solid #374151', padding: '8px 12px', color: '#d1d5db', fontSize: '13px' };
+
 function Message({ msg }) {
   const [codeOpen, setCodeOpen] = useState(false);
 
@@ -80,7 +85,14 @@ function Message({ msg }) {
         {msg.streaming ? (
           <span>{msg.content}<span style={{ opacity: 0.5 }}>▋</span></span>
         ) : (
-          msg.content
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              table: ({node, ...props}) => <table style={tableStyle} {...props} />,
+              th: ({node, ...props}) => <th style={thStyle} {...props} />,
+              td: ({node, ...props}) => <td style={tdStyle} {...props} />
+            }}
+          >{msg.content}</ReactMarkdown>
         )}
         {msg.code_executed?.length > 0 && !msg.streaming && (
           <div style={{ marginTop: '12px' }}>
@@ -152,19 +164,13 @@ export default function Analysis({ session, onReset }) {
         }
       }
 
-      // Fetch full result for code + drill-down
-      const full = await axios.post('http://localhost:8000/api/analyze', {
-        session_id: session.session_id,
-        question
-      });
-
       setMessages(prev => prev.map(m => m.id === streamingId ? {
         ...m,
-        content: full.data.answer || fullText,
+        content: fullText,
         streaming: false,
-        code_executed: full.data.code_executed,
-        drill_down: full.data.drill_down,
-        iterations: full.data.iterations
+        code_executed: [],
+        drill_down: [],
+        iterations: 1
       } : m));
 
     } catch (err) {
