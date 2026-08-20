@@ -1,6 +1,6 @@
 # Data Analysis Agent
 
-[▶ Watch demo](docs/demo.mov)
+[▶ Watch demo](https://youtu.be/xxLrINaFZGo)
 
 An agentic AI system that lets you upload any CSV or Excel dataset and ask questions about it in plain English. The agent autonomously writes Python analysis code, executes it, self-corrects errors, and returns statistically-validated insights in real time.
 
