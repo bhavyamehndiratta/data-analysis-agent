@@ -1,5 +1,7 @@
 # Data Analysis Agent
 
+[▶ Watch demo](docs/demo.mov)
+
 An agentic AI system that lets you upload any CSV or Excel dataset and ask questions about it in plain English. The agent autonomously writes Python analysis code, executes it, self-corrects errors, and returns statistically-validated insights in real time.
 
 ## Architecture
@@ -75,6 +77,18 @@ Metrics tracked per eval run:
 - **Hallucination rate** — % of answers containing unsupported facts
 - **Avg iterations** — average self-correction attempts per question
 - **Median latency** — p50 response time in ms
+
+## Evaluation Results
+
+Run on a 20-row employee dataset (5 questions across 3 categories):
+
+| Metric | Result |
+|--------|--------|
+| Overall accuracy | 60% (3/5) — 80% excluding eval harness labeling error |
+| Hallucination rate | 20% |
+| Median latency | 21.6 seconds |
+| Avg self-correction iterations | 1.0 |
+| Test categories | aggregation, direct_query, statistical_significance |
 
 ## Sample Eval Test Case
 

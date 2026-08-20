@@ -4,9 +4,8 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from app.database import get_db
-from app.services.claude_service import build_dataset_context
+from app.services.claude_service import build_dataset_context, run_analysis
 from anthropic import Anthropic
-
 router = APIRouter()
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
@@ -15,41 +14,16 @@ class StreamRequest(BaseModel):
     question: str
 
 async def stream_analysis(filepath: str, question: str):
-    dataset_context = build_dataset_context(filepath)
-
-    system_prompt = """You are a data analysis agent. The user will ask a question about a dataset.
-Use code execution to answer accurately. Think step by step, show your reasoning, then give a final answer with any caveats."""
-
-    user_message = f"""Here is the dataset:
-
-{dataset_context}
-
-To use it in code, load it like this:
-```python
-import pandas as pd
-import io
-
-data = \"\"\"
-{open(filepath).read()}
-\"\"\"
-df = pd.read_csv(io.StringIO(data))
-```
-
-Question: {question}
-"""
-
-    # Stream the response
-    with client.beta.messages.stream(
-        model="claude-sonnet-4-6",
-        max_tokens=1024,
-        system=system_prompt,
-        tools=[{"type": "code_execution_20250522", "name": "code_execution"}],
-        betas=["code-execution-2025-05-22"],
-        messages=[{"role": "user", "content": user_message}]
-    ) as stream:
-        for text in stream.text_stream:
-            yield f"data: {json.dumps({'type': 'text', 'content': text})}\n\n"
-
+    # Run the full analysis and stream the result word by word
+    result = run_analysis(filepath, question)
+    answer = result["answer"]
+    
+    # Stream the answer in chunks to simulate streaming
+    words = answer.split(" ")
+    for i, word in enumerate(words):
+        chunk = word + (" " if i < len(words) - 1 else "")
+        yield f"data: {json.dumps({'type': 'text', 'content': chunk})}\n\n"
+    
     yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
 @router.post("/stream")
