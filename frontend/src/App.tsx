@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import Upload from './components/Upload';
 import Analysis from './components/Analysis';
+import type { SessionInfo } from './types';
 
 function App() {
-  const [session, setSession] = useState(null);
+  const [session, setSession] = useState<SessionInfo | null>(null);
 
   return (
     <div style={{ minHeight: '100vh', background: '#030712', color: '#f9fafb' }}>

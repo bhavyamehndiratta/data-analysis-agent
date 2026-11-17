@@ -1,14 +1,19 @@
-import React, { useState, useCallback } from 'react';
-import axios from 'axios';
-import { Upload as UploadIcon, FileText, AlertCircle } from 'lucide-react';
+import React, { useState, useCallback, useRef } from 'react';
+import axios, { AxiosError } from 'axios';
+import { Upload as UploadIcon, AlertCircle } from 'lucide-react';
+import type { SessionInfo, ApiErrorBody } from '../types';
 
-export default function Upload({ onSessionCreated }) {
-  const [dragging, setDragging] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const inputRef = React.useRef();
+interface UploadProps {
+  onSessionCreated: (session: SessionInfo) => void;
+}
 
-  const handleFile = async (file) => {
+export default function Upload({ onSessionCreated }: UploadProps) {
+  const [dragging, setDragging] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = useCallback(async (file: File | undefined) => {
     if (!file) return;
     setLoading(true);
     setError(null);
@@ -17,29 +22,30 @@ export default function Upload({ onSessionCreated }) {
     formData.append('file', file);
 
     try {
-      const res = await axios.post('http://localhost:8000/api/upload', formData);
+      const res = await axios.post<SessionInfo>('http://localhost:8000/api/upload', formData);
       onSessionCreated(res.data);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Upload failed.');
+      const axiosErr = err as AxiosError<ApiErrorBody>;
+      setError(axiosErr.response?.data?.detail || 'Upload failed.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [onSessionCreated]);
 
-  const onDrop = useCallback((e) => {
+  const onDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragging(false);
     const file = e.dataTransfer.files[0];
     handleFile(file);
-  }, []);
+  }, [handleFile]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
       <div
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragOver={(e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
-        onClick={() => inputRef.current.click()}
+        onClick={(e: React.MouseEvent<HTMLDivElement>) => { e.stopPropagation(); inputRef.current?.click(); }}
         style={{
           border: `2px dashed ${dragging ? '#6366f1' : '#374151'}`,
           borderRadius: '12px',
@@ -57,7 +63,7 @@ export default function Upload({ onSessionCreated }) {
           type="file"
           accept=".csv,.xlsx,.xls"
           style={{ display: 'none' }}
-          onChange={(e) => handleFile(e.target.files[0])}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFile(e.target.files?.[0])}
         />
         <UploadIcon size={36} color={dragging ? '#6366f1' : '#6b7280'} style={{ margin: '0 auto 16px' }} />
         {loading ? (

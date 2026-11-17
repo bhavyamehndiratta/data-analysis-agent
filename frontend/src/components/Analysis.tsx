@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, RotateCcw, ChevronDown, ChevronRight, FileText, Code } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import type { SessionInfo, DrillDownItem, ChatMessage, StreamEvent } from '../types';
 
-function DataQuality({ session }) {
-  const issues = [];
+function DataQuality({ session }: { session: SessionInfo }) {
+  const issues: string[] = [];
   if (Object.keys(session.missing_values).length > 0) {
     issues.push(`Missing values in: ${Object.keys(session.missing_values).join(', ')}`);
   }
@@ -17,7 +19,7 @@ function DataQuality({ session }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
         <FileText size={16} color='#6366f1' />
         <span style={{ fontWeight: 500, fontSize: '14px' }}>{session.filename}</span>
-        <span style={{ color: '#6b7280', fontSize: '13px' }}>— {session.rows} rows × {session.columns} columns</span>
+        <span style={{ color: '#6b7280', fontSize: '13px' }}>· {session.rows} rows × {session.columns} columns</span>
       </div>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         {session.column_names.map(col => (
@@ -35,8 +37,8 @@ function DataQuality({ session }) {
   );
 }
 
-function DrillDown({ items }) {
-  const [open, setOpen] = useState(false);
+function DrillDown({ items }: { items?: DrillDownItem[] }) {
+  const [open, setOpen] = useState<boolean>(false);
   if (!items || items.length === 0) return null;
 
   return (
@@ -62,12 +64,18 @@ function DrillDown({ items }) {
   );
 }
 
-const tableStyle = { borderCollapse: 'collapse', width: '100%', margin: '12px 0' };
-const thStyle = { border: '1px solid #374151', padding: '8px 12px', background: '#1f2937', color: '#f9fafb', fontSize: '13px', textAlign: 'left' };
-const tdStyle = { border: '1px solid #374151', padding: '8px 12px', color: '#d1d5db', fontSize: '13px' };
+const tableStyle: React.CSSProperties = { borderCollapse: 'collapse', width: '100%', margin: '12px 0' };
+const thStyle: React.CSSProperties = { border: '1px solid #374151', padding: '8px 12px', background: '#1f2937', color: '#f9fafb', fontSize: '13px', textAlign: 'left' };
+const tdStyle: React.CSSProperties = { border: '1px solid #374151', padding: '8px 12px', color: '#d1d5db', fontSize: '13px' };
 
-function Message({ msg }) {
-  const [codeOpen, setCodeOpen] = useState(false);
+const markdownComponents: Components = {
+  table: ({ node, ...props }) => <table style={tableStyle} {...props} />,
+  th: ({ node, ...props }) => <th style={thStyle} {...props} />,
+  td: ({ node, ...props }) => <td style={tdStyle} {...props} />
+};
+
+function Message({ msg }: { msg: ChatMessage }) {
+  const [codeOpen, setCodeOpen] = useState<boolean>(false);
 
   if (msg.role === 'user') {
     return (
@@ -85,16 +93,9 @@ function Message({ msg }) {
         {msg.streaming ? (
           <span>{msg.content}<span style={{ opacity: 0.5 }}>▋</span></span>
         ) : (
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-              table: ({node, ...props}) => <table style={tableStyle} {...props} />,
-              th: ({node, ...props}) => <th style={thStyle} {...props} />,
-              td: ({node, ...props}) => <td style={tdStyle} {...props} />
-            }}
-          >{msg.content}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{msg.content}</ReactMarkdown>
         )}
-        {msg.code_executed?.length > 0 && !msg.streaming && (
+        {msg.code_executed && msg.code_executed.length > 0 && !msg.streaming && (
           <div style={{ marginTop: '12px' }}>
             <button
               onClick={() => setCodeOpen(!codeOpen)}
@@ -111,7 +112,7 @@ function Message({ msg }) {
           </div>
         )}
         {msg.drill_down && <DrillDown items={msg.drill_down} />}
-        {msg.iterations > 1 && !msg.streaming && (
+        {msg.iterations !== undefined && msg.iterations > 1 && !msg.streaming && (
           <p style={{ marginTop: '8px', fontSize: '12px', color: '#4b5563' }}>Self-corrected in {msg.iterations} iteration{msg.iterations > 1 ? 's' : ''}</p>
         )}
       </div>
@@ -119,11 +120,16 @@ function Message({ msg }) {
   );
 }
 
-export default function Analysis({ session, onReset }) {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const bottomRef = useRef();
+interface AnalysisProps {
+  session: SessionInfo;
+  onReset: () => void;
+}
+
+export default function Analysis({ session, onReset }: AnalysisProps) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -146,6 +152,9 @@ export default function Analysis({ session, onReset }) {
         body: JSON.stringify({ session_id: session.session_id, question })
       });
 
+      if (!response.ok || !response.body) {
+        throw new Error(`Stream request failed with status ${response.status}`);
+      }
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let fullText = '';
@@ -156,10 +165,11 @@ export default function Analysis({ session, onReset }) {
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
         for (const line of lines) {
-          const data = JSON.parse(line.slice(6));
-          if (data.type === 'text') {
+          const data: StreamEvent = JSON.parse(line.slice(6));
+          if (data.type === 'text' && data.content) {
             fullText += data.content;
-            setMessages(prev => prev.map(m => m.id === streamingId ? { ...m, content: fullText } : m));
+            const snapshot = fullText;
+            setMessages(prev => prev.map(m => m.id === streamingId ? { ...m, content: snapshot } : m));
           }
         }
       }
@@ -208,8 +218,8 @@ export default function Analysis({ session, onReset }) {
       <div style={{ display: 'flex', gap: '10px', position: 'sticky', bottom: '24px' }}>
         <input
           value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && sendQuestion()}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
+          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') sendQuestion(); }}
           placeholder="Ask a question about your data..."
           disabled={loading}
           style={{

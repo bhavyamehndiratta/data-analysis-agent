@@ -36,6 +36,7 @@ Streaming Response → User
 - **LLM:** Claude API (claude-sonnet-4-6) with hosted code execution
 - **Database:** SQLite (session persistence, analysis history, eval data)
 - **Streaming:** Server-Sent Events (SSE)
+- **Frontend:** React, TypeScript
 
 ## Setup
 
